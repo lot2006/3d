@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORGE·3D — توليد النماذج ثلاثية الأبعاد</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Tajawal:wght@300;400;700;900&display=swap');
+
+  :root {
+    --bg: #060810;
+    --surface: #0d1120;
+    --card: #111827;
+    --border: #1e2d4a;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --success: #10b981;
+    --glow: rgba(0, 212, 255, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Ambient orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    animation: float 8s ease-in-out infinite;
+  }
+  .orb-1 { width: 500px; height: 500px; background: rgba(124,58,237,0.12); top: -100px; right: -100px; }
+  .orb-2 { width: 400px; height: 400px; background: rgba(0,212,255,0.08); bottom: 0; left: -100px; animation-delay: -4s; }
+  .orb-3 { width: 300px; height: 300px; background: rgba(245,158,11,0.06); top: 50%; left: 50%; animation-delay: -2s; }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-30px); }
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(6,8,16,0.8);
+    backdrop-filter: blur(20px);
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-shadow: 0 0 30px rgba(0,212,255,0.5);
+  }
+
+  .logo span { color: var(--accent3); }
+
+  .badge {
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+    color: white;
+    animation: pulse-badge 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    z-index: 5;
+    text-align: center;
+    padding: 80px 40px 60px;
+  }
+
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 6px 16px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent);
+    margin-bottom: 24px;
+    letter-spacing: 1px;
+  }
+
+  .hero-tag::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  h1 {
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 600px;
+    margin: 0 auto 40px;
+    line-height: 1.7;
+    font-weight: 300;
+  }
+
+  /* Main workspace */
+  .workspace {
+    position: relative;
+    z-index: 5;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 768px) {
+    .workspace { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .panel:hover { border-color: rgba(0,212,255,0.3); }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .panel-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    margin: 24px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    background: rgba(0,212,255,0.02);
+  }
+
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.05);
+    transform: scale(1.01);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  .upload-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(124,58,237,0.15));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
+  .upload-zone h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .upload-zone p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .upload-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.15);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* Preview image */
+  #preview-container {
+    margin: 0 24px 24px;
+    display: none;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.3);
+  }
+
+  #preview-container img {
+    width: 100%;
+    height: 220px;
+    object-fit: contain;
+    padding: 12px;
+  }
+
+  .remove-img {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    color: var(--muted);
+    z-index: 2;
+  }
+
+  .remove-img:hover { background: rgba(239,68,68,0.3); color: #ef4444; border-color: #ef4444; }
+
+  /* Settings */
+  .settings {
+    padding: 0 24px 24px;
+  }
+
+  .setting-group {
+    margin-bottom: 20px;
+  }
+
+  .setting-group label {
+    display: block;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  .setting-group select,
+  .setting-group input[type="range"] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    appearance: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .setting-group select:focus,
+  .setting-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .slider-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 30px;
+    text-align: center;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Generate button */
+  .btn-generate {
+    width: calc(100% - 48px);
+    margin: 0 24px 24px;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-generate::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, white 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .btn-generate:hover::before { opacity: 0.1; }
+  .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(0,212,255,0.3); }
+  .btn-generate:active { transform: translateY(0); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Output panel */
+  .output-area {
+    padding: 24px;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* 3D Viewer placeholder */
+  .viewer-3d {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .viewer-3d canvas {
+    position: absolute;
+    inset: 0;
+  }
+
+  .viewer-placeholder {
+    text-align: center;
+    z-index: 2;
+  }
+
+  .cube-3d {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 16px;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: spin3d 6s linear infinite;
+  }
+
+  @keyframes spin3d {
+    from { transform: rotateX(20deg) rotateY(0deg); }
+    to { transform: rotateX(20deg) rotateY(360deg); }
+  }
+
+  .cube-face {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border: 2px solid rgba(0,212,255,0.4);
+    background: rgba(0,212,255,0.05);
+  }
+  .cube-face.front  { transform: translateZ(30px); }
+  .cube-face.back   { transform: translateZ(-30px) rotateY(180deg); }
+  .cube-face.left   { transform: rotateY(-90deg) translateZ(30px); }
+  .cube-face.right  { transform: rotateY(90deg) translateZ(30px); }
+  .cube-face.top    { transform: rotateX(90deg) translateZ(30px); }
+  .cube-face.bottom { transform: rotateX(-90deg) translateZ(30px); }
+
+  .viewer-placeholder p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Analysis result */
+  .result-box {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .result-box.active { display: flex; }
+
+  /* 3D model display after generation */
+  #model-viewer {
+    width: 100%;
+    height: 260px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: none;
+  }
+
+  #model-viewer.active { display: block; }
+
+  #model-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .result-card h4 {
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  .result-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Download buttons */
+  .download-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-dl {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .btn-dl.glb { background: rgba(0,212,255,0.08); border-color: var(--accent); color: var(--accent); }
+  .btn-dl.obj { background: rgba(124,58,237,0.08); border-color: var(--accent2); color: var(--accent2); }
+  .btn-dl.report { background: rgba(245,158,11,0.08); border-color: var(--accent3); color: var(--accent3); }
+
+  .btn-dl:hover { transform: translateY(-1px); opacity: 0.8; }
+
+  /* Loading */
+  .loading-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    gap: 20px;
+    min-height: 260px;
+  }
+
+  .loading-state.active { display: flex; }
+
+  .spinner-3d {
+    width: 50px;
+    height: 50px;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: spin3d 1.5s linear infinite;
+  }
+
+  .spinner-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid transparent;
+  }
+
+  .spinner-ring:nth-child(1) {
+    border-top-color: var(--accent);
+    animation: spinX 1.5s linear infinite;
+  }
+
+  .spinner-ring:nth-child(2) {
+    border-right-color: var(--accent2);
+    animation: spinY 1.5s linear infinite;
+  }
+
+  .spinner-ring:nth-child(3) {
+    border-bottom-color: var(--accent3);
+    animation: spinZ 1.5s linear infinite;
+  }
+
+  @keyframes spinX { from{transform:rotateX(0)} to{transform:rotateX(360deg)} }
+  @keyframes spinY { from{transform:rotateY(0)} to{transform:rotateY(360deg)} }
+  @keyframes spinZ { from{transform:rotateZ(0)} to{transform:rotateZ(360deg)} }
+
+  .loading-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .loading-step {
+    font-size: 13px;
+    color: var(--muted);
+    transition: color 0.3s;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .loading-step.active { color: var(--accent); }
+  .loading-step.done { color: var(--success); }
+
+  /* Features bar */
+  .features {
+    position: relative;
+    z-index: 5;
+    max-width: 1100px;
+    margin: 0 auto 60px;
+    padding: 0 24px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    transition: all 0.3s;
+  }
+
+  .feature-card:hover {
+    border-color: rgba(0,212,255,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+
+  .feature-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .feature-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .feature-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* Error */
+  .error-box {
+    display: none;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    color: #ef4444;
+    text-align: center;
+  }
+
+  .error-box.active { display: block; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<header>
+  <div class="logo">FORGE<span>·</span>3D</div>
+  <div class="badge">AI POWERED</div>
+</header>
+
+<section class="hero">
+  <div class="hero-tag">صورة → نموذج ثلاثي الأبعاد</div>
+  <h1>حوّل صورك إلى<br>عوالم ثلاثية الأبعاد</h1>
+  <p>ارفع أي صورة وسيقوم الذكاء الاصطناعي بتحليلها وتوليد وصف دقيق وخصائص النموذج ثلاثي الأبعاد فوراً</p>
+</section>
+
+<div class="workspace">
+  <!-- Input Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="dot"></div>
+      INPUT · رفع الصورة
+    </div>
+
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*">
+      <div class="upload-icon">🖼️</div>
+      <h3>ارفع صورتك هنا</h3>
+      <p>PNG, JPG, WEBP — يُفضّل خلفية شفافة</p>
+      <div class="upload-hint">📁 اختر ملفاً أو اسحبه هنا</div>
+    </div>
+
+    <div id="preview-container">
+      <button class="remove-img" onclick="removeImage()">✕</button>
+      <img id="preview-img" src="" alt="preview">
+    </div>
+
+    <div class="settings">
+      <div class="setting-group">
+        <label>نوع النموذج المطلوب</label>
+        <select id="model-type">
+          <option value="full">نموذج كامل مع مواد PBR</option>
+          <option value="lowpoly">Low-Poly (للألعاب)</option>
+          <option value="highres">High-Resolution (للطباعة)</option>
+          <option value="stylized">Stylized / مؤسلب</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label>دقة الشبكة (Mesh Resolution)</label>
+        <div class="slider-row">
+          <input type="range" id="resolution" min="64" max="512" value="256" step="64" 
+                 oninput="document.getElementById('res-val').textContent=this.value">
+          <span class="slider-val" id="res-val">256</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label>مستوى التفاصيل</label>
+        <select id="detail-level">
+          <option value="ultra">Ultra — أقصى دقة</option>
+          <option value="high">High — جودة عالية</option>
+          <option value="medium" selected>Medium — متوازن</option>
+          <option value="fast">Fast — سرعة أولاً</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-generate" id="gen-btn" onclick="generate()">
+      ⚡ توليد النموذج ثلاثي الأبعاد
+    </button>
+  </div>
+
+  <!-- Output Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="dot" style="background: var(--accent3); box-shadow: 0 0 8px var(--accent3);"></div>
+      OUTPUT · النموذج الناتج
+    </div>
+
+    <div class="output-area">
+      <!-- Default state -->
+      <div id="default-state">
+        <div class="viewer-3d">
+          <div class="viewer-placeholder">
+            <div class="cube-3d">
+              <div class="cube-face front"></div>
+              <div class="cube-face back"></div>
+              <div class="cube-face left"></div>
+              <div class="cube-face right"></div>
+              <div class="cube-face top"></div>
+              <div class="cube-face bottom"></div>
+            </div>
+            <p>في انتظار الصورة...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-state" id="loading-state">
+        <div class="spinner-3d">
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
+        </div>
+        <div class="loading-steps">
+          <div class="loading-step" id="step-1">◯ تحليل الصورة...</div>
+          <div class="loading-step" id="step-2">◯ استخراج الهندسة...</div>
+          <div class="loading-step" id="step-3">◯ توليد المواد PBR...</div>
+          <div class="loading-step" id="step-4">◯ بناء الشبكة النهائية...</div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-box" id="error-box"></div>
+
+      <!-- Results -->
+      <div class="result-box" id="result-box">
+        <!-- 3D Wireframe Viewer -->
+        <div id="model-viewer" class="active">
+          <canvas id="model-canvas"></canvas>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="stat-verts">-</div>
+            <div class="stat-label">Vertices</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-faces">-</div>
+            <div class="stat-label">Faces</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-mat">-</div>
+            <div class="stat-label">Materials</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-time">-</div>
+            <div class="stat-label">ثانية</div>
+          </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="result-card">
+          <h4>// تحليل الذكاء الاصطناعي</h4>
+          <div class="result-text" id="ai-result"></div>
+        </div>
+
+        <!-- Downloads -->
+        <div class="download-row">
+          <button class="btn-dl glb" onclick="downloadGLB()">⬇ GLB</button>
+          <button class="btn-dl obj" onclick="downloadOBJ()">⬇ OBJ</button>
+          <button class="btn-dl report" onclick="downloadReport()">⬇ تقرير</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Features -->
+<div class="features">
+  <div class="feature-card">
+    <div class="feature-icon">🔷</div>
+    <h3>O-Voxel Representation</h3>
+    <p>هيكل voxel متفرق ثوري يتعامل مع التضاريس المعقدة بدون تحويلات خسارة</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">✨</div>
+    <h3>مواد PBR كاملة</h3>
+    <p>Base Color، Roughness، Metallic، وOpacity — تقديم فوتوريالستي حقيقي</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">⚡</div>
+    <h3>تصدير فوري</h3>
+    <p>احصل على ملفات GLB و OBJ جاهزة للاستخدام في Blender و Unity و Unreal</p>
+  </div>
+</div>
+
+<script>
+  let imageData = null;
+  let imageBase64 = null;
+  let generationResult = null;
+  let animFrame = null;
+
+  // Upload handlers
+  const fileInput = document.getElementById('file-input');
+  const uploadZone = document.getElementById('upload-zone');
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+
+  function loadFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      imageBase64 = e.target.result.split(',')[1];
+      document.getElementById('preview-img').src = e.target.result;
+      document.getElementById('preview-container').style.display = 'block';
+      uploadZone.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage() {
+    imageBase64 = null;
+    document.getElementById('preview-container').style.display = 'none';
+    uploadZone.style.display = 'block';
+    fileInput.value = '';
+    resetOutput();
+  }
+
+  function resetOutput() {
+    document.getElementById('default-state').style.display = 'block';
+    document.getElementById('loading-state').classList.remove('active');
+    document.getElementById('result-box').classList.remove('active');
+    document.getElementById('error-box').classList.remove('active');
+    if (animFrame) cancelAnimationFrame(animFrame);
+  }
+
+  async function generate() {
+    if (!imageBase64) {
+      alert('الرجاء رفع صورة أولاً!');
+      return;
+    }
+
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = true;
+
+    document.getElementById('default-state').style.display = 'none';
+    document.getElementById('result-box').classList.remove('active');
+    document.getElementById('error-box').classList.remove('active');
+
+    const loadingEl = document.getElementById('loading-state');
+    loadingEl.classList.add('active');
+
+    const steps = ['step-1','step-2','step-3','step-4'];
+    steps.forEach(s => {
+      const el = document.getElementById(s);
+      el.classList.remove('active', 'done');
+      el.textContent = el.textContent.replace(/[✓◯]/, '◯');
+    });
+
+    const startTime = Date.now();
+
+    // Animate steps
+    const stepInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const currentStep = Math.min(Math.floor(elapsed / 1500), 3);
+      steps.forEach((s, i) => {
+        const el = document.getElementById(s);
+        const labels = ['تحليل الصورة...','استخراج الهندسة...','توليد المواد PBR...','بناء الشبكة النهائية...'];
+        if (i < currentStep) { el.classList.remove('active'); el.classList.add('done'); el.textContent = '✓ ' + labels[i]; }
+        else if (i === currentStep) { el.classList.add('active'); el.textContent = '◯ ' + labels[i]; }
+      });
+    }, 200);
+
+    const modelType = document.getElementById('model-type').value;
+    const resolution = document.getElementById('resolution').value;
+    const detailLevel = document.getElementById('detail-level').value;
+
+    const prompt = `أنت نظام ذكاء اصطناعي متخصص في تحليل الصور وتوليد مواصفات النماذج ثلاثية الأبعاد.
+
+حلّل هذه الصورة وقدّم:
+
+1. **وصف الكائن**: ماذا يوجد في الصورة؟ (2-3 جمل)
+2. **الهندسة الثلاثية الأبعاد**:
+   - نوع الهندسة (عضوية/هندسية/مختلطة)
+   - التضاريس المتوقعة (بسيطة/معقدة/معقدة جداً)
+   - الأجزاء المقترحة (كم جزء رئيسي)
+3. **مواد السطح المقترحة**:
+   - Base Color الرئيسي
+   - مستوى Roughness (0-1)
+   - مستوى Metallic (0-1)
+   - شفافية Opacity (نعم/لا)
+4. **إحصائيات النموذج المتوقعة**:
+   - عدد الـ Vertices (تقريباً)
+   - عدد الـ Faces (تقريباً)
+   - عدد المواد
+5. **توصيات الاستخدام**: أين يمكن استخدام هذا النموذج؟
+
+إعدادات المستخدم: نوع النموذج=${modelType}، الدقة=${resolution}، مستوى التفاصيل=${detailLevel}
+
+قدّم الإجابة بالعربية بشكل منظم ومفيد.`;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      });
+
+      clearInterval(stepInterval);
+      steps.forEach((s, i) => {
+        const el = document.getElementById(s);
+        const labels = ['تحليل الصورة','استخراج الهندسة','توليد المواد PBR','بناء الشبكة النهائية'];
+        el.classList.remove('active'); el.classList.add('done'); el.textContent = '✓ ' + labels[i];
+      });
+
+      if (!response.ok) throw new Error('API Error: ' + response.status);
+
+      const data = await response.json();
+      const text = data.content[0].text;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      generationResult = text;
+
+      // Parse rough stats from response
+      const vertsMatch = text.match(/(\d[\d,]+)\s*(vertex|vertices|رأس|رؤوس)/i);
+      const facesMatch = text.match(/(\d[\d,]+)\s*(face|polygon|وجه|مثلث|مضلع)/i);
+      const matMatch = text.match(/(\d+)\s*(material|مادة|خامة)/i);
+
+      document.getElementById('stat-verts').textContent = vertsMatch ? vertsMatch[1] : Math.floor(parseInt(resolution) * 180).toLocaleString();
+      document.getElementById('stat-faces').textContent = facesMatch ? facesMatch[1] : Math.floor(parseInt(resolution) * 340).toLocaleString();
+      document.getElementById('stat-mat').textContent = matMatch ? matMatch[1] : '3-5';
+      document.getElementById('stat-time').textContent = elapsed + 's';
+
+      document.getElementById('ai-result').textContent = text;
+
+      await new Promise(r => setTimeout(r, 300));
+      loadingEl.classList.remove('active');
+      document.getElementById('result-box').classList.add('active');
+
+      // Start 3D wireframe animation
+      init3DViewer();
+
+    } catch (err) {
+      clearInterval(stepInterval);
+      loadingEl.classList.remove('active');
+      const errEl = document.getElementById('error-box');
+      errEl.textContent = '⚠️ حدث خطأ: ' + err.message;
+      errEl.classList.add('active');
+      document.getElementById('default-state').style.display = 'block';
+    }
+
+    btn.disabled = false;
+  }
+
+  // Simple 3D wireframe visualizer
+  function init3DViewer() {
+    const canvas = document.getElementById('model-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    const W = canvas.width, H = canvas.height;
+    let angle = 0;
+
+    // Generate random mesh points based on resolution
+    const res = parseInt(document.getElementById('resolution').value);
+    const complexity = Math.floor(res / 64);
+    
+    // Create a dynamic mesh-like structure
+    const points = [];
+    for (let i = 0; i < 20 + complexity * 8; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      const r = 0.6 + Math.random() * 0.4;
+      points.push({
+        x: r * Math.sin(phi) * Math.cos(theta),
+        y: r * Math.sin(phi) * Math.sin(theta),
+        z: r * Math.cos(phi)
+      });
+    }
+
+    const edges = [];
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const dx = points[i].x - points[j].x;
+        const dy = points[i].y - points[j].y;
+        const dz = points[i].z - points[j].z;
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist < 0.7) edges.push([i, j]);
+      }
+    }
+
+    function project(p) {
+      const scale = Math.min(W, H) * 0.35;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const cosY = Math.cos(angle * 0.4);
+      const sinY = Math.sin(angle * 0.4);
+      
+      // Rotate Y then X
+      const x1 = p.x * cos - p.z * sin;
+      const z1 = p.x * sin + p.z * cos;
+      const y1 = p.y * cosY - z1 * sinY;
+      const z2 = p.y * sinY + z1 * cosY;
+
+      const fov = 3;
+      const pz = z2 + fov;
+      return {
+        sx: W/2 + (x1 / pz) * scale,
+        sy: H/2 + (y1 / pz) * scale,
+        depth: pz
+      };
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
+      // Dark background
+      ctx.fillStyle = '#0d1120';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid
+      ctx.strokeStyle = 'rgba(0,212,255,0.04)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < W; i += 30) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
+      }
+      for (let i = 0; i < H; i += 30) {
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke();
+      }
+
+      const projected = points.map(p => project(p));
+
+      // Draw edges
+      edges.forEach(([a, b]) => {
+        const pa = projected[a], pb = projected[b];
+        const avgDepth = (pa.depth + pb.depth) / 2;
+        const alpha = Math.max(0, Math.min(0.6, 1 - (avgDepth - 2) / 3));
+        ctx.strokeStyle = `rgba(0,212,255,${alpha})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(pa.sx, pa.sy);
+        ctx.lineTo(pb.sx, pb.sy);
+        ctx.stroke();
+      });
+
+      // Draw vertices
+      projected.forEach(p => {
+        const alpha = Math.max(0, Math.min(1, 1 - (p.depth - 2) / 3));
+        ctx.fillStyle = `rgba(0,212,255,${alpha * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(p.sx, p.sy, 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      angle += 0.008;
+      animFrame = requestAnimationFrame(draw);
+    }
+
+    draw();
+  }
+
+  function downloadReport() {
+    if (!generationResult) return;
+    const blob = new Blob([generationResult], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'forge3d-analysis.txt';
+    a.click();
+  }
+
+  function downloadGLB() {
+    alert('✅ في التطبيق الحقيقي، سيتم تحميل ملف GLB المولّد هنا.\n\nهذا العرض التجريبي يستخدم الذكاء الاصطناعي للتحليل.');
+  }
+
+  function downloadOBJ() {
+    alert('✅ في التطبيق الحقيقي، سيتم تحميل ملف OBJ المولّد هنا.\n\nهذا العرض التجريبي يستخدم الذكاء الاصطناعي للتحليل.');
+  }
+</script>
+</body>
+</html>
